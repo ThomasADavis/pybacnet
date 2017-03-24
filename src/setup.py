@@ -24,16 +24,16 @@ Copyright (c) 2013 Building Robotics, Inc.
 import os
 from distutils.core import setup, Extension
 
-inc_dir = ['bacnet-stack-0.6.0/include', 
-           'bacnet-stack-0.6.0/demo/object',
-           'bacnet-stack-0.6.0/ports/linux']
+inc_dir = ['bacnet-stack-0.8.3/include', 
+           'bacnet-stack-0.8.3/demo/object',
+           'bacnet-stack-0.8.3/ports/linux']
 
 prefix = os.path.dirname(os.path.abspath(__file__))
 inc_dir = [os.path.join(prefix, dir) for dir in inc_dir]
-lib_path = os.path.join(prefix, 'bacnet-stack-0.6.0/lib')
+lib_path = os.path.join(prefix, 'bacnet-stack-0.8.3/lib')
 bacnet_module = Extension('pybacnet._bacnet',
-  sources=['pybacnet/bacnet.c', 'pybacnet/bacnet.i'],
-  swig_opts=['-I' + os.path.join(prefix, 'bacnet-stack-0.6.0/include')],
+  sources=['pybacnet/bacnet.c', 'pybacnet/device-client.c', 'pybacnet/bacnet.i'],
+  swig_opts=['-I' + os.path.join(prefix, 'bacnet-stack-0.8.3/include')],
   libraries=['bacnet'],
   library_dirs=[lib_path],
   include_dirs=inc_dir)

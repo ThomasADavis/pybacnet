@@ -48,6 +48,41 @@
 #include "awf.h"
 #include "arf.h"
 
+static object_functions_t Object_Table[] = {
+    {OBJECT_DEVICE,
+        NULL /* Init - don't init Device or it will recourse! */ ,
+        Device_Count, 
+        Device_Index_To_Instance,
+        Device_Valid_Object_Instance_Number,
+        Device_Object_Name,
+        Device_Read_Property_Local,
+        NULL,
+	NULL,
+	NULL,
+        NULL /* Iterator */ ,
+        NULL /* Value_Lists */ ,
+        NULL /* COV */ ,
+        NULL /* COV Clear */ ,
+        NULL /* Intrinsic Reporting */ 
+    },
+    {MAX_BACNET_OBJECT_TYPE,
+        NULL /* Init */ ,
+        NULL /* Count */ ,
+        NULL /* Index_To_Instance */ ,
+        NULL /* Valid_Instance */ ,
+        NULL /* Object_Name */ ,
+        NULL /* Read_Property */ ,
+        NULL /* Write_Property */ ,
+        NULL /* Property_Lists */ ,
+        NULL /* ReadRangeInfo */ ,
+        NULL /* Iterator */ ,
+        NULL /* Value_Lists */ ,
+        NULL /* COV */ ,
+        NULL /* COV Clear */ ,
+        NULL /* Intrinsic Reporting */ 
+    }
+};
+
 int PyDict_SetItemString_Steal(PyObject *p, const char *key, PyObject *val) {
   int r = PyDict_SetItemString(p, key, val);
   assert(val->ob_refcnt > 1);
@@ -61,12 +96,6 @@ int PyList_Append_Steal(PyObject *list, PyObject *item) {
   Py_DECREF(item);
   return r;
 }
-
-/* All included BACnet objects */
-static object_functions_t Object_Table[] = {
-    {DEVICE_OBJ_FUNCTIONS},
-    {MAX_BACNET_OBJECT_TYPE, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL},
-};
 
 /* buffer used for receive */
 static uint8_t Rx_Buf[MAX_MPDU] = { 0 };
@@ -278,13 +307,14 @@ void Init(char *interface, char *port) {
     if (interface != NULL)
       setenv("BACNET_IFACE", interface, 1);
     if (port != NULL) {
-      //fprintf(stderr, "Warning: Chaning the port does not work for whois.\n");
+      //fprintf(stderr, "Warning: Changing the port does not work for whois.\n");
       setenv("BACNET_IP_PORT", port, 1);
     }
 #endif
 
     //Device_Set_Object_Instance_Number(BACNET_MAX_INSTANCE);
     Device_Init(&Object_Table[0]);
+    //Device_Init(NULL);
 
     /* we need to handle who-is to support dynamic device binding to us
     apdu_set_unconfirmed_handler(SERVICE_UNCONFIRMED_WHO_IS, handler_who_is);
@@ -515,7 +545,7 @@ static int wait_reply(uint8_t invoke_id) {
     time_t elapsed_seconds = 0;
     time_t timeout_seconds = (apdu_timeout() / 1000) * apdu_retries();
 
-    Error_Detected = false;
+    static bool Error_Detected = false;
     last_seconds = time(NULL);
 
     PyErr_Clear();              /* shouldn't be here if there's been an exception... */
@@ -524,14 +554,16 @@ static int wait_reply(uint8_t invoke_id) {
         if (current_seconds != last_seconds) {
           tsm_timer_milliseconds(((current_seconds - last_seconds) * 1000));
         }
+
         if (Error_Detected) {
+	    fprintf(stderr, "Error detected!\n");
             break;
-          }
+        }
 
         if (tsm_invoke_id_free(invoke_id)) {
             break;
         } else if (tsm_invoke_id_failed(invoke_id)) {
-            //fprintf(stderr, "Error: TSM Timeout!\n");
+            fprintf(stderr, "Error: TSM Timeout!\n");
             Error_Detected = true;
             break;
         }
@@ -563,6 +595,7 @@ static int wait_reply(uint8_t invoke_id) {
     if (got_data && !Error_Detected) {
         return 1;
     } else {
+	fprintf(stderr, "Error Detected; return 0!\n");
         return 0;
     }
 }
@@ -603,6 +636,7 @@ PyObject *read_prop(PyObject *dev, uint32_t object_type, uint32_t object_instanc
     Py_END_ALLOW_THREADS;
 
     if ((invoke_id = send_req(READ_PROPERTY, &dest, max_apdu, &data)) == 0) {
+	printf("read_prop: send_req failed.\n");
         pthread_mutex_unlock(&busy);
         return NULL;
     }
@@ -618,6 +652,7 @@ PyObject *read_prop(PyObject *dev, uint32_t object_type, uint32_t object_instanc
     } else {
         tsm_free_invoke_id(invoke_id);
         pthread_mutex_unlock(&busy);
+	//printf("read_prop: read_result failed.\n");
         return NULL;    /* SDH : wait_reply sets the exception code */
     }
 }
